@@ -43,3 +43,20 @@ npm run build       # টাইপচেক + index.html জেনারেট
 - টাইপচেক: `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes` — সব চালু।
 - প্যালেট বাছাই `localStorage`-এ সেভ হয়, রিলোডে মনে থাকে।
 - স্ট্যাট সংখ্যা বদলাতে `src/body.html`-এ `.stat__num`-এর `data-count` বদলে `npm run build` চালান।
+
+## GitHub-এ আপলোড
+
+```bash
+# ১. রিপো পাবলিক হলে ফন্টের লাইসেন্স নোটিশ বাধ্যতামূলক (নিচে দেখুন)
+git remote add origin https://github.com/shihabxpro/madrasa-site.git
+git branch -M main
+git push -u origin main
+```
+
+### GitHub Pages-এ লাইভ করতে (ঐচ্ছিক)
+Settings → Pages → **Source: Deploy from a branch** → Branch: `main`, Folder: `/ (root)` → Save।
+কয়েক মিনিট পর সাইট থাকবে: `https://shihabxpro.github.io/madrasa-site/`
+
+> **ফন্ট লাইসেন্স:** `assets/fonts/MahameruArabicDEMO-*.woff2` — Mahameru Arabic DEMO (NamelaType),
+> শুধু ব্যক্তিগত ব্যবহারের জন্য; বাণিজ্যিক ব্যবহার নিষিদ্ধ। সাইটটি পাবলিক রিপো/হোস্টিংয়ে দিলে
+> ফন্টের এই শর্ত প্রযোজ্য — বাণিজ্যিক ব্যবহারের আগে ফন্টের লাইসেন্স কিনতে হবে বা অন্য ফন্টে যেতে হবে।
