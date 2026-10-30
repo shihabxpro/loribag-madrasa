@@ -43,56 +43,96 @@ const storePalette = (name: PaletteName): void => {
 
 const initDrawer = (): void => {
   const button = $<HTMLButtonElement>('#menuBtn');
-  const drawer = $('#drawer');
-  if (!button || !drawer) return;
+  const wrap = $<HTMLElement>('#drawerWrap');
+  const drawer = $<HTMLElement>('#drawer');
+  if (!button || !drawer || !wrap) return;
 
-  const setNav = (open: boolean): void => {
+  const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  let lastFocus: HTMLElement | null = null;
+
+  const setNav = (open: boolean, restoreFocus = true): void => {
+    const isOpen = document.body.classList.contains('nav-open');
+    if (open === isOpen) return;
+
     document.body.classList.toggle('nav-open', open);
     button.setAttribute('aria-expanded', String(open));
     button.setAttribute('aria-label', open ? 'মেনু বন্ধ করুন' : 'মেনু খুলুন');
+    // the panel stays aria-hidden while closed; the wrapper is hidden by CSS visibility,
+    // which also keeps every link out of the Tab order without blocking the live region
     drawer.setAttribute('aria-hidden', String(!open));
-    document.body.style.overflow = open ? 'hidden' : '';
+
+    // lock the page behind the menu, without the layout jump of display:none
+    if (open) {
+      const scrollbar = window.innerWidth - document.documentElement.clientWidth;
+      document.body.style.overflow = 'hidden';
+      if (scrollbar > 0) document.body.style.paddingRight = `${scrollbar}px`;
+      lastFocus = document.activeElement as HTMLElement | null;
+      window.setTimeout(() => drawer.focus({ preventScroll: true }), 60);
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
+      if (restoreFocus && lastFocus && document.contains(lastFocus)) lastFocus.focus({ preventScroll: true });
+    }
   };
 
-  button.addEventListener('click', () => {
-    setNav(!document.body.classList.contains('nav-open'));
-  });
+  button.addEventListener('click', () => setNav(!document.body.classList.contains('nav-open')));
 
-  drawer.addEventListener('click', (event: MouseEvent) => {
-    if ((event.target as Element).closest('a')) setNav(false);
+  // the panel is full-screen, so "outside" means the empty area of the panel too:
+  // links navigate (and close); any other tap, or the scrim, just closes.
+  wrap.addEventListener('click', (event: MouseEvent) => {
+    const target = event.target as Element;
+    if (!target.closest('a') && !target.closest('[data-drawer-close]') && !target.closest('.drawer')) return;
+
+    const link = target.closest('a');
+    const hash = link?.getAttribute('href') ?? '';
+
+    // close first (this unlocks the page), then scroll — otherwise the scroll is swallowed
+    setNav(false, false);
+
+    if (!hash.startsWith('#')) return;
+    event.preventDefault();
+    const smooth = !prefersReducedMotion() ? 'smooth' : 'auto';
+
+    window.requestAnimationFrame(() => {
+      const destination = hash === '#top' ? null : document.querySelector<HTMLElement>(hash);
+      if (destination) destination.scrollIntoView({ behavior: smooth, block: 'start' });
+      else window.scrollTo({ top: 0, behavior: smooth });
+      window.history.replaceState(null, '', hash);
+    });
   });
 
   document.addEventListener('keydown', (event: KeyboardEvent) => {
-    if (event.key === 'Escape' && document.body.classList.contains('nav-open')) setNav(false);
+    if (!document.body.classList.contains('nav-open')) return;
+
+    if (event.key === 'Escape') {
+      setNav(false);
+      return;
+    }
+
+    // keep Tab inside the open menu
+    if (event.key === 'Tab') {
+      const items = Array.from(drawer.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+        (el) => el.offsetParent !== null
+      );
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (!first || !last) return;
+      const active = document.activeElement as HTMLElement | null;
+      if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      } else if (event.shiftKey && (active === first || active === drawer)) {
+        event.preventDefault();
+        last.focus();
+      }
+    }
+  });
+
+  // if the viewport grows past the mobile breakpoint, drop the lock
+  window.matchMedia('(min-width: 900px)').addEventListener('change', (event) => {
+    if (event.matches) setNav(false, false);
   });
 };
-
-/* ------------------------------ palette ------------------------------ */
-
-const initPalette = (): void => {
-  const root = document.documentElement;
-  const buttons = $$<HTMLButtonElement>('.swatch');
-
-  const applyPalette = (name: PaletteName, persist: boolean): void => {
-    root.setAttribute('data-palette', name);
-    buttons.forEach((button) => {
-      button.setAttribute('aria-pressed', String(button.dataset.palette === name));
-    });
-    if (persist) storePalette(name);
-  };
-
-  buttons.forEach((button) => {
-    button.addEventListener('click', () => {
-      const name = button.dataset.palette;
-      if (isPaletteName(name ?? null)) applyPalette(name as PaletteName, true);
-    });
-  });
-
-  const stored = readStoredPalette();
-  if (stored) applyPalette(stored, false);
-};
-
-/* ------------------------------- stats ------------------------------- */
 
 const BN_DIGITS = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'] as const;
 
@@ -101,6 +141,7 @@ const toBengaliDigits = (value: number): string =>
     .split('')
     .map((char) => BN_DIGITS[Number(char)] ?? char)
     .join('');
+
 
 const formatStat = (value: number, withPlus: boolean): string =>
   toBengaliDigits(value) + (withPlus ? '<span class="plus">+</span>' : '');
@@ -434,6 +475,33 @@ const initTeachers = (): void => {
   window.addEventListener('resize', onScroll, { passive: true });
 
   sync();
+};
+
+/* ------------------------------- palette ----------------------------- */
+
+const initPalette = (): void => {
+  const root = document.documentElement;
+  const swatches = $$<HTMLButtonElement>('.swatch');
+
+  const apply = (name: PaletteName): void => {
+    root.dataset.palette = name;
+    swatches.forEach((swatch) => {
+      swatch.setAttribute('aria-pressed', String(swatch.dataset.palette === name));
+    });
+  };
+
+  // restore the visitor's last choice before anything paints
+  const stored = readStoredPalette();
+  apply(stored ?? 'emerald');
+
+  swatches.forEach((swatch) => {
+    swatch.addEventListener('click', () => {
+      const name = swatch.dataset.palette;
+      if (!isPaletteName(name ?? null)) return;
+      apply(name as PaletteName);
+      storePalette(name as PaletteName);
+    });
+  });
 };
 
 /* ------------------------------ typewriter ---------------------------- */
