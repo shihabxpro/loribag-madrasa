@@ -311,13 +311,13 @@ body.nav-open .palette-bar{opacity:0; visibility:hidden; transform:translate(-50
 .drawer__list li{border-bottom:1px solid var(--line);}
 .drawer__list a{
   display:flex; align-items:center; gap:14px;
-  padding:18px 4px;
+  padding:clamp(13px,2vh,17px) 4px;
   color:var(--ink); text-decoration:none;
-  font-size:clamp(18px,2.4vw,22px); font-weight:600;
+  font-size:clamp(16.5px,2.2vw,21px); font-weight:600;
   transition:color .25s var(--ease), padding-left .3s var(--ease);
 }
 .drawer__list a:hover{color:var(--accent); padding-left:10px;}
-.drawer__aside{margin-top:14px; padding-top:14px; border-top:1px solid var(--line);}
+.drawer__aside{margin-top:clamp(8px,1.4vh,12px); border-top:1px solid var(--line);}
 .drawer__aside a{opacity:.9;}
 
 .drawer__icon{
